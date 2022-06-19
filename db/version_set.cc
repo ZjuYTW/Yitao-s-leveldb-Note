@@ -467,6 +467,7 @@ bool Version::OverlapInLevel(int level, const Slice* smallest_user_key,
                                smallest_user_key, largest_user_key);
 }
 
+// TODO(ZjuYTW): 这里应该是根据smallest、largest以及是否与该Level的file有重合选出一个Level, 具体的作用还没看懂
 int Version::PickLevelForMemTableOutput(const Slice& smallest_user_key,
                                         const Slice& largest_user_key) {
   int level = 0;
@@ -480,6 +481,7 @@ int Version::PickLevelForMemTableOutput(const Slice& smallest_user_key,
       if (OverlapInLevel(level + 1, &smallest_user_key, &largest_user_key)) {
         break;
       }
+      // 这里这个判断其实是不需要的吧, 不过应该和config也有关系
       if (level + 2 < config::kNumLevels) {
         // Check that file does not overlap too many grandparent bytes.
         GetOverlappingInputs(level + 2, &start, &limit, &overlaps);

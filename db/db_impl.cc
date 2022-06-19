@@ -346,6 +346,14 @@ Status DBImpl::Recover(VersionEdit* edit, bool* save_manifest) {
   uint64_t number;
   FileType type;
   std::vector<uint64_t> logs;
+  // 用filename作为类型的判断， 一般的格式:
+  // dbname/CURRENT       
+  // dbname/LOCK
+  // dbname/LOG
+  // dbname/LOG.old       
+  // dbname/MANIFEST-[0-9]+
+  // dbname/[0-9]+.(log|sst|ldb)
+  // TODO(ZjuYTW): kInfoLogFile与kLogFile的关联是啥, 目前看上去前者是Metadata
   for (size_t i = 0; i < filenames.size(); i++) {
     if (ParseFileName(filenames[i], &number, &type)) {
       expected.erase(number);
@@ -452,6 +460,7 @@ Status DBImpl::RecoverLogFile(uint64_t log_number, bool last_log,
       *max_sequence = last_seq;
     }
 
+    // TODO(ZjuYTW): 细看Memtable中的结构，为什么这里从日志中还原的时候会涉及到memtable到SStable的转换
     if (mem->ApproximateMemoryUsage() > options_.write_buffer_size) {
       compactions++;
       *save_manifest = true;
@@ -516,6 +525,8 @@ Status DBImpl::WriteLevel0Table(MemTable* mem, VersionEdit* edit,
   Status s;
   {
     mutex_.Unlock();
+    // 为啥这里不用上锁？如果不上锁不会存在迭代器失效的情况嘛
+    // Ans: 在Write的时候MemTable应该是immutable的了
     s = BuildTable(dbname_, env_, options_, table_cache_, iter, &meta);
     mutex_.Lock();
   }
@@ -1217,6 +1228,7 @@ Status DBImpl::Write(const WriteOptions& options, WriteBatch* updates) {
   uint64_t last_sequence = versions_->LastSequence();
   Writer* last_writer = &w;
   if (status.ok() && updates != nullptr) {  // nullptr batch is for compactions
+    // Make multi-write's batch write into one
     WriteBatch* write_batch = BuildBatchGroup(&last_writer);
     WriteBatchInternal::SetSequence(write_batch, last_sequence + 1);
     last_sequence += WriteBatchInternal::Count(write_batch);
@@ -1332,6 +1344,8 @@ Status DBImpl::MakeRoomForWrite(bool force) {
       // Yield previous error
       s = bg_error_;
       break;
+    // 这个地方的Delay是为了 1：控制L0文件的数目 2: 可以让compaction thread更快的得到CPU
+    // 看上去有一点Hack 
     } else if (allow_delay && versions_->NumLevelFiles(0) >=
                                   config::kL0_SlowdownWritesTrigger) {
       // We are getting close to hitting a hard limit on the number of
@@ -1466,7 +1480,9 @@ void DBImpl::GetApproximateSizes(const Range* range, int n, uint64_t* sizes) {
 
 // Default implementations of convenience methods that subclasses of DB
 // can call if they wish
+// 在纯虚类上面定义了一个实现，然后在子类上面使用DB::Put去call....nb
 Status DB::Put(const WriteOptions& opt, const Slice& key, const Slice& value) {
+  // 写WAL
   WriteBatch batch;
   batch.Put(key, value);
   return Write(opt, &batch);

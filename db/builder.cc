@@ -14,6 +14,13 @@
 
 namespace leveldb {
 
+// 通过iter构造表， 参数的作用分别为
+// dbname: 指定dbname
+// env: 创建写入表格
+// options: 有一些创建表时就设置的opt（TBC）
+// table_cache: table的cache，这里的作用就是用来生成了一个Iterator，用来验证build的Table是可被发现的
+// iter: 上一级Table的it
+// meta: 这个新生成表的Meta
 Status BuildTable(const std::string& dbname, Env* env, const Options& options,
                   TableCache* table_cache, Iterator* iter, FileMetaData* meta) {
   Status s;
