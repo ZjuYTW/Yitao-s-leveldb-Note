@@ -2,6 +2,8 @@
 *.sw*
 .vscode
 .DS_Store
+.cache
+leveldb_read.MD
 
 # Build directory.
 build/

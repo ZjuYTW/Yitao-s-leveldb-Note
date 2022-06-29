@@ -152,12 +152,15 @@ struct SkipList<Key, Comparator>::Node {
     assert(n >= 0);
     // Use an 'acquire load' so that we observe a fully initialized
     // version of the returned Node.
+    // acquire的语义可以保证当SetNext执行完毕之后, Next永远可以见到原子的新的
+    // next_[n]
     return next_[n].load(std::memory_order_acquire);
   }
   void SetNext(int n, Node* x) {
     assert(n >= 0);
     // Use a 'release store' so that anybody who reads through this
     // pointer observes a fully initialized version of the inserted node.
+    // 保证acquire在看到这个store值的时候，这行之前的代码都已经执行了
     next_[n].store(x, std::memory_order_release);
   }
 
@@ -331,6 +334,10 @@ SkipList<Key, Comparator>::SkipList(Comparator cmp, Arena* arena)
   }
 }
 
+// TODO(ZjuYTW) : 回顾一下跳表的实现 + 理解一下这里为什么不需要额外的同步机制
+// 这里的注释表明了Insert中没有处理多写的逻辑， 但是在外层调用时看上去也是先mu_.Unlock
+// 再调用这个函数的，有点奇怪
+// Answer see (db_impl.cc:1241)
 template <typename Key, class Comparator>
 void SkipList<Key, Comparator>::Insert(const Key& key) {
   // TODO(opt): We can use a barrier-free variant of FindGreaterOrEqual()
@@ -353,6 +360,11 @@ void SkipList<Key, Comparator>::Insert(const Key& key) {
     // the loop below.  In the former case the reader will
     // immediately drop to the next level since nullptr sorts after all
     // keys.  In the latter case the reader will use the new node.
+    // 因为下面这行store的原子性, 所以一个并发执行的读者在看max_height_的时候只有
+    // 1: 得到旧值, 此时读者「有可能」会读到新的Node,取决于SetNext有没有执行，只要执行了一次
+    // 即，设置了最小level的那层，就能够查到最新的数据
+    // 2: 得到新值，如果没有执行下面的Set，则会直接jump到下一层。 如果设置了值，则能够找到
+    // 期望的Node
     max_height_.store(height, std::memory_order_relaxed);
   }
 

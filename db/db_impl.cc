@@ -1238,7 +1238,11 @@ Status DBImpl::Write(const WriteOptions& options, WriteBatch* updates) {
     // and protects against concurrent loggers and concurrent writes
     // into mem_.
     {
+      // 此时log_和mem_的写入都是靠&w, 由于w是writers_队列的front，所以只有这么一个Write可以控制写入 -> 解决了写写冲突
+      // 如何解决读写冲突呢？ 猜测是因为正常情况下不会对WAL进行读(待验证)，SkipList结构本身就可以解决读写的问题(顺序一致)
+      // TODO(ZjuYTW): P0
       mutex_.Unlock();
+      // log format: 4 byte crc | 1 byte type | 2 byte length| (length) byte content
       status = log_->AddRecord(WriteBatchInternal::Contents(write_batch));
       bool sync_error = false;
       if (status.ok() && options.sync) {

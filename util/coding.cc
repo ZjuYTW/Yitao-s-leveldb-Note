@@ -18,6 +18,10 @@ void PutFixed64(std::string* dst, uint64_t value) {
   dst->append(buf, sizeof(buf));
 }
 
+/**
+ * 这里将一个32位的整型映射到了一个可变的字符串上，目的应该是为了节约空间
+ * 具体的形式是 for every 8bits char: |low 7 bit for actual data|high 1 bit FIN bit|
+*/
 char* EncodeVarint32(char* dst, uint32_t v) {
   // Operate on characters as unsigneds
   uint8_t* ptr = reinterpret_cast<uint8_t*>(dst);
