@@ -102,6 +102,10 @@ void MemTable::Add(SequenceNumber s, ValueType type, const Slice& key,
 bool MemTable::Get(const LookupKey& key, std::string* value, Status* s) {
   Slice memkey = key.memtable_key();
   Table::Iterator iter(&table_);
+  // 这里的Seek如果cmp函数写的是反的话，比如如果我们定义了以size作为比较的偏序关系的话
+  // like: if(memkey.size() < store_entry.size()) return 1;
+  // 那是不是就找不到这个store_entry了，因为这里是找FirstGreateEqual?
+  // TODO(ZjuYTW): 可以写一个测试函数验证一下
   iter.Seek(memkey.data());
   if (iter.Valid()) {
     // entry format is:

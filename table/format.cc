@@ -61,6 +61,8 @@ Status Footer::DecodeFrom(Slice* input) {
   return result;
 }
 
+// 很多地方复用了这个函数， 因为handle的形式都大致相同， 均为offset + size
+// 最终返回的内容为 (offset's skipped bytes) + |n's bytes content| + (kBlockTrailerSize's check bytes)
 Status ReadBlock(RandomAccessFile* file, const ReadOptions& options,
                  const BlockHandle& handle, BlockContents* result) {
   result->data = Slice();
@@ -96,6 +98,7 @@ Status ReadBlock(RandomAccessFile* file, const ReadOptions& options,
 
   switch (data[n]) {
     case kNoCompression:
+      // 这里data != buf是说明buf前面还有些奇奇怪怪的内容，具体是啥还不清楚
       if (data != buf) {
         // File implementation gave us pointer to some other data.
         // Use it directly under the assumption that it will be live
