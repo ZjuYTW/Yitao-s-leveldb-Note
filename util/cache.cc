@@ -291,7 +291,9 @@ Cache::Handle* LRUCache::Insert(const Slice& key, uint32_t hash, void* value,
     // next is read by key() in an assert, so it must be initialized
     e->next = nullptr;
   }
+  // evict
   while (usage_ > capacity_ && lru_.next != &lru_) {
+    // 注： 当使用量超过capacity时，将lru中的冷数据都驱逐到水位线以下
     LRUHandle* old = lru_.next;
     assert(old->refs == 1);
     bool erased = FinishErase(table_.Remove(old->key(), old->hash));
